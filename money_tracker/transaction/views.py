@@ -18,6 +18,8 @@ class trans(APIView):
         type = request.data.get("type")
         category = request.data.get("category")
 
+
+
         made_by = User.objects.get(pk = made_by)      
         made_to = User.objects.get(pk = made_to)
 
@@ -33,7 +35,7 @@ class trans(APIView):
             made_to.budget.save()
 
             #---------------------------------- group transaction -------------------------------------------------
-            if type == "group":
+            if type == "group" :
                 group_name = request.data.get("group_name")
                 grp_members = request.data.get("group_members")
                 no_of_per = request.data.get("no_of_per")
@@ -49,16 +51,47 @@ class trans(APIView):
                         grp_trans_made_to = made_to,
                         no_of_per = no_of_per,
                         desc = desc,
-                        amount_pp = amount/no_of_per
+                        amount_pp = amount/no_of_per,
+                        grp_trans_id = trans_obj
                     )
 
                     group.save()
                     group.grp_members.set(grp_members)
+
+
+                    for ob in group.grp_members.all():
+                        print(ob.username)
+                        ob.budget.borrow += amount/no_of_per
+                        ob.budget.save()
+                    print(group.grp_made_by.id)
+                    group.grp_made_by.budget.lend += (amount - amount/no_of_per)
+                    group.grp_made_by.budget.save()
+
                 except Exception as e:
                     print(e)
                     return Response({'message':"not valid enteries for group transaction:"+str(e)},status=HTTP_400_BAD_REQUEST)
 
             # -----------grup transaction end here---------------------------------------------------------------
+            #--------------------------repay------------------------------------------------------------------------
+            elif type == "repay":
+                grp_list = request.data.get("grp_list")
+                for grp in grp_list:
+                    grp_instance = Groups_trans.objects.get(pk = grp)
+                    amount -= grp_instance.amount_pp # debug
+                    grp_instance.no_of_per -= 1
+                    # if grp_instance.no_of_per == 1:
+                    #     grp_instance.delete()
+                    # else:
+                    grp_instance.grp_members.remove(made_by)
+                    grp_instance.save()
+
+                # for debugging
+                if amount == 0:
+                    print("amount exhausted")
+                else:
+                    print("insufficient amount")
+
+            #--------------------------repay end-------------------------------------------------------
             return Response({
                 "transaction_id" : trans_obj.id,
                 "budget of receiver": made_to.budget.income,
@@ -108,6 +141,26 @@ class trans(APIView):
             trans_id.made_to.budget.income -= trans_id.amount
             trans_id.made_by.budget.save()
             trans_id.made_to.budget.save()
+
+        #  ------------------------group case----------------------------------------------------------
+
+
+            if trans_id.type == "group":
+                group = Groups_trans.objects.get(grp_trans_id = trans_id)
+                for ob in group.grp_members.all():
+                    print(ob.username,ob.budget.borrow)
+                    ob.budget.borrow -= group.amount_pp
+                    print(ob.budget.borrow)
+                    ob.budget.save()
+                print(group.grp_made_by.username,group.grp_made_by.budget.lend,group.amount_pp,trans_id.amount - group.amount_pp)
+                group.grp_made_by.budget.lend -= (trans_id.amount - group.amount_pp)
+                print(group.grp_made_by.budget.lend)
+                group.grp_made_by.budget.save()
+
+
+        # -------------------------group case end ------------------------------------------------------
+
+
             trans_id.delete()
             return Response({'message' : "Deleted successfully"},status=HTTP_200_OK)
         except Exception as e:
@@ -135,6 +188,25 @@ class trans(APIView):
             trans_id.made_by.budget.save()
             trans_id.made_to.budget.save()
             print("accepted")
+
+        #  ------------------------ cancelling group case----------------------------------------------------------
+
+
+            if trans_id.type == "group":
+                group = Groups_trans.objects.get(grp_trans_id = trans_id)
+                for ob in group.grp_members.all():
+                    print(ob.username,ob.budget.borrow)
+                    ob.budget.borrow -= group.amount_pp
+                    print(ob.budget.borrow)
+                    ob.budget.save()
+                    print(group.grp_made_by.username,group.grp_made_by.budget.lend,group.amount_pp,trans_id.amount - group.amount_pp)
+                    group.grp_made_by.budget.lend -= (trans_id.amount - group.amount_pp)
+                    print(group.grp_made_by.budget.lend)
+                    group.grp_made_by.budget.save()
+
+
+        # -------------------------group case end ------------------------------------------------------
+
 
             made_by = User.objects.get(pk = made_by)
             made_to = User.objects.get(pk = made_to)
@@ -168,6 +240,7 @@ class groups_list(APIView):
         grp_obj = Groups_trans.objects.all()
 
         l = [{
+            "id" :obj.id,
             "group_name" : obj.group_name,
             "grp_made_by" : obj.grp_made_by.username,
             "grp_trans_made_to" : obj.grp_trans_made_to.username ,
@@ -181,38 +254,50 @@ class groups_list(APIView):
 
 class lended(APIView):
     def get(self,request):
+        user = request.data.get("user_id")
+        user = User.objects.get(pk = user)     
+        print(user)
 
-        grp_obj = Groups_trans.objects.filter(grp_made_by = request.user)
+        grp_obj = Groups_trans.objects.filter(grp_made_by = user)
         l = [{
             "group_name" : obj.group_name,
             "grp_members" :[{"name" : ob.username,
                             "amount_pp" : obj.amount_pp} for ob in obj.grp_members.all()],            
         } for obj in grp_obj]
 
-        user = User.objects.all()
-        res = {obj.username : 0  for obj in user}
+        user_all = User.objects.all()
+        res = {obj.username : 0  for obj in user_all}
 
         # res = {"user3" : 0,"user2":0,"user1": 0}
 
         rr = {}
+        ct = 0
         for i in l:
             for j in i["grp_members"]:
+                ct += j["amount_pp"]
                 res[j["name"]] += j["amount_pp"]
+            
+        user.budget.lend = ct
+        user.budget.save()
+
+        
 
         print(res)
             
-        return Response(l,status=HTTP_200_OK)
+        return Response(res,status=HTTP_200_OK)
 
 class borrowed(APIView):
     def get(self,request):
-        user = request.user.username
+        user = request.data.get("user_id")
+        user = User.objects.get(pk = user)     
         print(user)
-        grp_obj = Groups_trans.objects.all().exclude(grp_made_by = request.user)
+        grp_obj = Groups_trans.objects.all().exclude(grp_made_by = user)
 
         
         user_all = User.objects.all()
         res = {obj.username : 0  for obj in user_all}
 
+        ct = 0
         for obj in grp_obj.all():
             print("heelllo")
             for ob in obj.grp_members.all():
@@ -221,16 +306,17 @@ class borrowed(APIView):
                     print("hero123")
                     print(obj.amount_pp)
                     print(obj.grp_made_by)
+                    ct += obj.amount_pp
                     res[obj.grp_made_by.username] += obj.amount_pp
                     break
 
-        # for i in l:
-        #     for j in i["grp_members"]:
-        #         res[j["name"]] += j["amount_pp"]
-
+        user.budget.borrow = ct
+        user.budget.save()
         print(res)
             
         return Response(res,status=HTTP_200_OK)
+
+
 
     
 

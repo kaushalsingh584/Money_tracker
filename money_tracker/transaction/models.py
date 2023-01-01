@@ -18,7 +18,7 @@ class Groups_trans(models.Model):
     group_name = models.CharField(max_length=100,unique=True)
     grp_made_by = models.ForeignKey(User,on_delete=models.CASCADE,related_name="grp_made_by",null=True,blank=True)
     grp_trans_made_to = models.ForeignKey(User,on_delete=models.CASCADE,related_name="grp_trans_made_to",null=True,blank=True)
-    # grp_trans_id = models.OneToOneField(Mas_trans,on_delete=models.CASCADE)
+    grp_trans_id = models.OneToOneField(Mas_trans,on_delete=models.CASCADE)
     desc = models.CharField(max_length=500)
     grp_members = models.ManyToManyField(User,related_name= "grp_member")
     no_of_per = models.IntegerField(default  = 0)

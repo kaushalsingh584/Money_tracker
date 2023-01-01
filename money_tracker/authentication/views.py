@@ -58,7 +58,10 @@ class info(APIView):
     def get(self,request):
         user_obj = User.objects.all()
         l = [{
+            "id" : obj.id,
             "username" : obj.username,
-            "income":obj.budget.income
+            "income":obj.budget.income,
+            "borrow" : obj.budget.borrow,
+            "lend" : obj.budget.lend
         } for obj in user_obj]
         return Response(l,status=HTTP_200_OK)
