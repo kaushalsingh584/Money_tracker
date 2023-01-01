@@ -25,4 +25,6 @@ urlpatterns = [
     path('trans/',views_trans.trans.as_view() ,name = "trans") ,
     path('get_users/',views.info.as_view() ,name = "get_users"),
     path('group_list/',views_trans.groups_list.as_view() ,name = "group_list"),
+    path('lend/',views_trans.lended.as_view() ,name = "lend"),
+    path('borrowed/',views_trans.borrowed.as_view() ,name = "borrow")
 ]

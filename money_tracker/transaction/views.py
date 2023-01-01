@@ -177,3 +177,60 @@ class groups_list(APIView):
         } for obj in grp_obj]
 
         return Response(l,status=HTTP_200_OK)
+
+
+class lended(APIView):
+    def get(self,request):
+
+        grp_obj = Groups_trans.objects.filter(grp_made_by = request.user)
+        l = [{
+            "group_name" : obj.group_name,
+            "grp_members" :[{"name" : ob.username,
+                            "amount_pp" : obj.amount_pp} for ob in obj.grp_members.all()],            
+        } for obj in grp_obj]
+
+        user = User.objects.all()
+        res = {obj.username : 0  for obj in user}
+
+        # res = {"user3" : 0,"user2":0,"user1": 0}
+
+        rr = {}
+        for i in l:
+            for j in i["grp_members"]:
+                res[j["name"]] += j["amount_pp"]
+
+        print(res)
+            
+        return Response(l,status=HTTP_200_OK)
+
+class borrowed(APIView):
+    def get(self,request):
+        user = request.user.username
+        print(user)
+        grp_obj = Groups_trans.objects.all().exclude(grp_made_by = request.user)
+
+        
+        user_all = User.objects.all()
+        res = {obj.username : 0  for obj in user_all}
+
+        for obj in grp_obj.all():
+            print("heelllo")
+            for ob in obj.grp_members.all():
+                print("hero",ob.username,user)
+                if str(ob.username) == str(user):
+                    print("hero123")
+                    print(obj.amount_pp)
+                    print(obj.grp_made_by)
+                    res[obj.grp_made_by.username] += obj.amount_pp
+                    break
+
+        # for i in l:
+        #     for j in i["grp_members"]:
+        #         res[j["name"]] += j["amount_pp"]
+
+        print(res)
+            
+        return Response(res,status=HTTP_200_OK)
+
+    
+
